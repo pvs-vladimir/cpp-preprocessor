@@ -37,6 +37,7 @@ bool ProcessFile(const path& in_file, ofstream& out, const vector<path>& include
     int line = 1;
     
     ifstream in(in_file);
+    // проверяет открытие файлов во время рекурсии по include_directories в ProcessDirectories, без нее не работает
     if (!in) {
         return false;
     }
@@ -79,6 +80,9 @@ bool Preprocess(const path& in_file, const path& out_file, const vector<path>& i
         return false;
     }
     ofstream out(out_file);
+    if (!out) {
+        return false;
+    }
     
     return ProcessFile(in_file, out, include_directories);
 }
