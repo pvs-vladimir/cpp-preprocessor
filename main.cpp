@@ -10,17 +10,82 @@
 using namespace std;
 using filesystem::path;
 
+bool ProcessFile(const path& in_file, ofstream& out, const vector<path>& include_directories);
+
 path operator""_p(const char* data, std::size_t sz) {
     return path(data, data + sz);
 }
 
-// напишите эту функцию
-bool Preprocess(const path& in_file, const path& out_file, const vector<path>& include_directories);
+void PrintProcessError(const string& file, const string& in_file, int line) {
+    cout << "unknown include file "s << file << " at file "s << in_file 
+        << " at line "s << line << endl;
+}
+
+bool ProcessDirectories(const path& match_path, ofstream& out, const vector<path>& include_directories) {
+    for (const path& dir : include_directories) {
+        path p_dir = dir / match_path;
+        if (ProcessFile(p_dir, out, include_directories)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ProcessFile(const path& in_file, ofstream& out, const vector<path>& include_directories) {
+    static regex regex1(R"/(\s*#\s*include\s*"([^"]*)"\s*)/");
+    static regex regex2(R"/(\s*#\s*include\s*<([^>]*)>\s*)/");
+    int line = 1;
+    
+    ifstream in(in_file);
+    if (!in) {
+        return false;
+    }
+    
+    while(in) {
+        string str;
+        getline(in, str);
+        if (in.eof() && str.empty()) {
+            return true;
+        }
+        
+        smatch m;
+        if (regex_match(str, m, regex1)) {
+            path match_path = string(m[1]);
+            path p = in_file.parent_path() / match_path;
+            if (!ProcessFile(p, out, include_directories)) {
+                if (!ProcessDirectories(match_path, out, include_directories)) {
+                    PrintProcessError(string(m[1]), in_file.string(), line);
+                    return false;
+                }
+            }
+        } else if (regex_match(str, m, regex2)) {
+            path match_path = string(m[1]);
+            if (!ProcessDirectories(match_path, out, include_directories)) {
+                PrintProcessError(string(m[1]), in_file.string(), line);
+                return false;
+            }
+        } else {
+            out << str << endl;
+        }
+        ++line;
+    }
+    
+    return true;
+}
+
+bool Preprocess(const path& in_file, const path& out_file, const vector<path>& include_directories) {
+    ifstream in(in_file);
+    if (!in) {
+        return false;
+    }
+    ofstream out(out_file);
+    
+    return ProcessFile(in_file, out, include_directories);
+}
 
 string GetFileContents(string file) {
     ifstream stream(file);
 
-    // конструируем string по двум итераторам
     return {(istreambuf_iterator<char>(stream)), istreambuf_iterator<char>()};
 }
 
